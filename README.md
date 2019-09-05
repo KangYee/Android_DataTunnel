@@ -17,11 +17,15 @@ DataTunnel.install(application);
 @DataTunnelFilter(key = "VideoActivity", accepts = {})
 public class VideoActivity extends AppCompatActivity implements DataTunnelProtocol {
     @Override
-    public Object dataToTunnel() {
-        Map<String, Object> map = new HashMap<>();
+    public Object dataReadyToTunnel() {
         map.put("from", "play");
-        map.put("videoId", 1);
+        map.put("videoId", 1234);
         return map;
+    }
+    
+    @Override
+    public void afterDataToTunnel() {
+        map = null;
     }
 }
 ```
