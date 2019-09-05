@@ -11,7 +11,6 @@ import com.hangzhou.santa.datatunnel.tunnel.DataTunnelBuilder;
 
 import java.util.HashMap;
 import java.util.List;
-import java.util.ListIterator;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -47,7 +46,7 @@ public class DataTunnel {
 
     }
 
-
+    private static Map<String, Object> dataCacheMap = new ConcurrentHashMap<>();
     private static Map<String, Object> dataMap = new ConcurrentHashMap<>();
     private static List<String> keyList = new CopyOnWriteArrayList<>();
     private static DataTunnelActivityLifecycle mDataTunnelActivityLifecycle;
@@ -68,6 +67,7 @@ public class DataTunnel {
                 DataTunnelFilter dataTunnelFilter = getFilter(fragment.getClass());
                 if (dataTunnelFilter != null && fragment instanceof DataTunnelProtocol) {
                     DataTunnel.onPaused(dataTunnelFilter, (DataTunnelProtocol) fragment);
+                    removeDataCache(dataTunnelFilter.key(), (DataTunnelProtocol) fragment);
                 }
             }
 
@@ -76,14 +76,6 @@ public class DataTunnel {
                 DataTunnelFilter dataTunnelFilter = getFilter(fragment.getClass());
                 if (dataTunnelFilter != null && fragment instanceof DataTunnelProtocol) {
                     DataTunnel.onDestroyed(dataTunnelFilter);
-                }
-
-                if (mDataTunnelFragmentLifecycles.get(fragment.getActivity()) != null) {
-                    DataTunnelFragmentLifecycle dataTunnelFragmentLifecycle = mDataTunnelFragmentLifecycles.get(fragment.getActivity());
-                    if (dataTunnelFragmentLifecycle != null) {
-                        dataTunnelFragmentLifecycle.stopWatchingFragments();
-//                        mDataTunnelFragmentLifecycles.remove(activity);
-                    }
                 }
             }
         };
@@ -108,6 +100,7 @@ public class DataTunnel {
                 DataTunnelFilter dataTunnelFilter = getFilter(activity.getClass());
                 if (dataTunnelFilter != null && activity instanceof DataTunnelProtocol) {
                     DataTunnel.onPaused(dataTunnelFilter, (DataTunnelProtocol) activity);
+                    removeDataCache(dataTunnelFilter.key(), (DataTunnelProtocol) activity);
                 }
             }
 
@@ -167,17 +160,16 @@ public class DataTunnel {
     }
 
     private synchronized static void onPaused(DataTunnelFilter filter, DataTunnelProtocol protocol) {
-        Object o = protocol.dataToTunnel();
+        Object o = protocol.dataReadyToTunnel();
         if (o != null) {
             dataMap.put(filter.key(), o);
             if (!keyList.isEmpty() && filter.key().equals(keyList.get(keyList.size() - 1))) {
                 return;
             }
-            ListIterator<String> iterator = keyList.listIterator();
-            while (iterator.hasNext()) {
-                String string = iterator.next();
-                if (string.equals(filter.key())) {
-                    iterator.remove();
+
+            for (String key : keyList) {
+                if (key.equals(filter.key())) {
+                    keyList.remove(key);
                 }
             }
             keyList.add(filter.key());
@@ -200,7 +192,10 @@ public class DataTunnel {
                 if (keyList.get(i).equals(mapKey)) {
                     Object o = maps.get(mapKey);
                     if (o instanceof Map) {
-                        return ((Map)o).get(subKey);
+                        Object subVal = ((Map)o).get(subKey);
+                        if (subVal != null) {
+                            return subVal;
+                        }
                     }
                 }
             }
@@ -208,4 +203,17 @@ public class DataTunnel {
         throw new IllegalStateException("getNewestByKey can not call after pause -> resume");
     }
 
+
+    static void putDataCache(String key, Object object) {
+        dataCacheMap.put(key, object);
+    }
+
+    static Object getDataCache(String key) {
+        return dataCacheMap.get(key);
+    }
+
+    private static void removeDataCache(String key, DataTunnelProtocol dataTunnelProtocol) {
+        dataCacheMap.remove(key);
+        dataTunnelProtocol.afterDataToTunnel();
+    }
 }

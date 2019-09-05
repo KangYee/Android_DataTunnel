@@ -17,4 +17,12 @@ public class DataTunnelUtil {
         return DataTunnel.getNewestBySubKey(key, maps);
     }
 
+
+    public static void putDataCache(String key, Object object) {
+        DataTunnel.putDataCache(key, object);
+    }
+
+    public static Object getDataCache(String key) {
+        return DataTunnel.getDataCache(key);
+    }
 }
